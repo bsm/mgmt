@@ -17,6 +17,19 @@ Or, just download it:
 
 == Usage
 
+Create a Gomtfile, e.g.:
+
+    # Standard dependencies
+    github.com/gorilla/context
+    github.com/onsi/ginkgo
+    github.com/onsi/gomega
+
+    # Custom repo
+    github.com/gorilla/mux !git@bitbucket.org/private/fork
+
+    # Custom branch/tag/version
+    github.com/gorilla/schema #c21d52ca
+
 Usage:
 
     mgmt command [arguments]

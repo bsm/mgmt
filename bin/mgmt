@@ -6,8 +6,8 @@ require 'tempfile'
 module MGMT
   extend self
 
-  GODFILE  = "Gofile"
-  LOCKFILE = "Gofile.lock"
+  GODFILE  = "Gomtfile"
+  LOCKFILE = "Gomtfile.lock"
   VENDOR   = ".vendor"
   VERSION  = "0.1.1"
 
@@ -51,7 +51,10 @@ module MGMT
   end
 
   def parse(line)
-    tokens = line.strip.split(/ +/)
+    line   = line.strip
+    return if line[0] == "#"
+
+    tokens = line.split(/ +/)
     return if tokens.empty?
 
     opts = {}
