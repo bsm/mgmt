@@ -69,6 +69,11 @@ module MGMT
     Dep.new tokens[0], opts
   end
 
+  def exec(*c)
+    ENV['GOPATH'] = "#{File.expand_path(VENDOR, ".")}:#{ENV['GOPATH']}"
+    Kernel.exec *c
+  end
+
   class Dep
     attr_reader   :name, :repo
     attr_accessor :tag
@@ -108,8 +113,7 @@ when "install", nil
   MGMT.pull(deps)
   MGMT.write_lockfile(deps)
 when "go"
-  ENV['GOPATH'] = "#{File.expand_path(VENDOR, ".")}:#{ENV['GOPATH']}"
-  Kernel.exec ARGV.join(' ')
+  MGMT.exec "go", *ARGV
 when "update"
   deps = MGMT.read_deps
   some = deps.select {|d| ARGV.include?(d.name) }
