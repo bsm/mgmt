@@ -59,7 +59,7 @@ module MGMT
 
     opts = {}
     tokens[1..-1].each do |token|
-      case token[0]
+      case token.first
       when "!"
         opts[:repo] = token[1..-1]
       when "#"
