@@ -9,7 +9,7 @@ module MGMT
   GODFILE  = "Gomtfile"
   LOCKFILE = "Gomtfile.lock"
   VENDOR   = ".vendor"
-  VERSION  = "0.1.1"
+  VERSION  = "0.1.2"
 
   def xputs(code, msg)
     code = nil if ENV['TERM'] != "xterm"
@@ -104,7 +104,8 @@ end
 
 case ARGV.shift
 when "install", nil
-  MGMT.pull(MGMT.read_deps)
+  deps = MGMT.read_deps
+  MGMT.pull(deps)
   MGMT.write_lockfile(deps)
 when "go"
   ENV['GOPATH'] = "#{File.expand_path(VENDOR, ".")}:#{ENV['GOPATH']}"
