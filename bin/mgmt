@@ -6,10 +6,10 @@ require 'tempfile'
 module MGMT
   extend self
 
-  GODFILE  = "Godfile"
-  LOCKFILE = "Godfile.lock"
+  GODFILE  = "Gofile"
+  LOCKFILE = "Gofile.lock"
   VENDOR   = ".vendor"
-  VERSION  = "0.1.0"
+  VERSION  = "0.1.1"
 
   def xputs(code, msg)
     code = nil if ENV['TERM'] != "xterm"
@@ -133,4 +133,4 @@ The commands are:
 
 )
   exit 2
-end if $0 == __FILE__
+end if File.basename($0) == File.basename(__FILE__)
