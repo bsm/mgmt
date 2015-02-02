@@ -1,0 +1,136 @@
+#!/usr/bin/env ruby
+
+require 'fileutils'
+require 'tempfile'
+
+module MGMT
+  extend self
+
+  GODFILE  = "Godfile"
+  LOCKFILE = "Godfile.lock"
+  VENDOR   = ".vendor"
+  VERSION  = "0.1.0"
+
+  def xputs(code, msg)
+    code = nil if ENV['TERM'] != "xterm"
+    print "\033[#{code}m" if code
+    print msg
+    print "\033[0m" if code
+    print "\n"
+  end
+
+  def sh(cmd)
+    system(cmd) || abort("Failed to execute command: #{cmd}")
+  end
+
+  def abort(msg)
+    xputs "31;1", ">>>> #{msg}"
+    Kernel.exit(1)
+  end
+
+  def pull(deps)
+    deps.each do |dep|
+      xputs "33;1", "---> #{dep.name}"
+      dep.pull!
+    end
+  end
+
+  def read_deps
+    source = File.exist?(LOCKFILE) ? LOCKFILE : GODFILE
+    abort "#{source} not found" unless File.exist?(source)
+
+    File.read(source).each_line.map {|ln| parse(ln) }.compact
+  end
+
+  def write_lockfile(deps)
+    temp = Tempfile.new LOCKFILE
+    deps.each {|d| temp.puts d.to_s }
+    temp.close
+    FileUtils.mv temp.path, LOCKFILE
+    xputs "32", "==== #{LOCKFILE} written"
+  end
+
+  def parse(line)
+    tokens = line.strip.split(/ +/)
+    return if tokens.empty?
+
+    opts = {}
+    tokens[1..-1].each do |token|
+      case token[0]
+      when "!"
+        opts[:repo] = token[1..-1]
+      when "#"
+        opts[:tag]  = token[1..-1]
+      end
+    end
+    Dep.new tokens[0], opts
+  end
+
+  class Dep
+    attr_reader   :name, :repo
+    attr_accessor :tag
+
+    def initialize(name, opts = {})
+      @name = name
+      @tag  = opts[:tag]
+      @repo = opts[:repo] || "http://#{name}"
+    end
+
+    def target
+      @target ||= File.join(VENDOR, 'src', @name)
+    end
+
+    def pull!
+      if File.directory?(target)
+        MGMT.sh "git -C #{target} fetch origin"
+      else
+        MGMT.sh "git clone #{@repo} #{target}"
+      end
+
+      @tag ||= `git -C #{target} log -n 1 --pretty=format:'%h'`.strip
+      MGMT.sh "git -C #{target} reset --hard #{@tag}"
+    end
+
+    def to_s
+      "#{@name} ##{@tag} !#{@repo}"
+    end
+  end
+end
+
+# -------------------------------------------------------------------------
+
+case ARGV.shift
+when "install", nil
+  MGMT.pull(MGMT.read_deps)
+  MGMT.write_lockfile(deps)
+when "go"
+  ENV['GOPATH'] = "#{File.expand_path(VENDOR, ".")}:#{ENV['GOPATH']}"
+  Kernel.exec ARGV.join(' ')
+when "update"
+  deps = MGMT.read_deps
+  some = deps.select {|d| ARGV.include?(d.name) }
+  unless some.empty?
+    some.each {|d| d.tag = nil }
+    MGMT.pull(some)
+    MGMT.write_lockfile(deps)
+  end
+when "version"
+  puts MGMT::VERSION
+else
+  puts %(mgmt is a minimalistic solution to managing Go dependencies.
+
+Usage:
+
+  mgmt command [arguments]
+
+The commands are:
+
+  install  bundle dependencies in .vendor
+  go       run go within the scope of .vendor
+  update   update a single package
+  version  print the version
+  help     print this information
+
+)
+  exit 2
+end if $0 == __FILE__
