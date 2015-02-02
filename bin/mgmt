@@ -9,7 +9,7 @@ module MGMT
   GODFILE  = "Gomtfile"
   LOCKFILE = "Gomtfile.lock"
   VENDOR   = ".vendor"
-  VERSION  = "0.1.2"
+  VERSION  = "0.1.3"
 
   def xputs(code, msg)
     code = nil if ENV['TERM'] != "xterm"
