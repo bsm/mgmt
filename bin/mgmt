@@ -9,7 +9,7 @@ module MGMT
   GODFILE  = "Gomtfile"
   LOCKFILE = "Gomtfile.lock"
   VENDOR   = ".vendor"
-  VERSION  = "0.1.4"
+  VERSION  = "0.1.5"
 
   def xputs(code, msg)
     code = nil if ENV['TERM'] != "xterm"
@@ -90,7 +90,7 @@ module MGMT
 
     def pull!
       if File.directory?(target)
-        MGMT.sh "git -C #{target} fetch origin"
+        MGMT.sh "git -C #{target} pull -q origin master"
       else
         MGMT.sh "git clone #{@repo} #{target}"
       end
