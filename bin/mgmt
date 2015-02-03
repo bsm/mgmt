@@ -6,10 +6,10 @@ require 'tempfile'
 module MGMT
   extend self
 
-  GODFILE  = "Gomtfile"
-  LOCKFILE = "Gomtfile.lock"
+  DEPSFILE = "Gopherfile"
+  LOCKFILE = "Gopherfile.lock"
   VENDOR   = ".vendor"
-  VERSION  = "0.1.5"
+  VERSION  = "0.2.0"
 
   def xputs(code, msg)
     code = nil if ENV['TERM'] != "xterm"
@@ -36,7 +36,7 @@ module MGMT
   end
 
   def read_deps
-    source = File.exist?(LOCKFILE) ? LOCKFILE : GODFILE
+    source = File.exist?(LOCKFILE) ? LOCKFILE : DEPSFILE
     abort "#{source} not found" unless File.exist?(source)
 
     File.read(source).each_line.map {|ln| parse(ln) }.compact
