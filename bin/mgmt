@@ -24,49 +24,30 @@ module MGMT
   end
 
   def abort(msg)
-    xputs "31;1", ">>>> #{msg}"
+    xputs "31", ">>> #{msg}"
     Kernel.exit(1)
+  end
+
+  def read
+    abort "#{DEPSFILE} not found" unless File.exist?(DEPSFILE)
+
+    deps = Deps.parse(DEPSFILE)
+    deps.merge! Deps.parse(LOCKFILE) if File.exist?(LOCKFILE)
+    deps
   end
 
   def pull(deps)
     deps.each do |dep|
-      xputs "33;1", "---> #{dep.name}"
-      dep.pull!
-    end
-  end
-
-  def read_deps
-    source = File.exist?(LOCKFILE) ? LOCKFILE : DEPSFILE
-    abort "#{source} not found" unless File.exist?(source)
-
-    File.read(source).each_line.map {|ln| parse(ln) }.compact
-  end
-
-  def write_lockfile(deps)
-    temp = Tempfile.new LOCKFILE
-    deps.each {|d| temp.puts d.to_s }
-    temp.close
-    FileUtils.mv temp.path, LOCKFILE
-    xputs "32", "==== #{LOCKFILE} written"
-  end
-
-  def parse(line)
-    line   = line.strip
-    return if line[0] == "#"
-
-    tokens = line.split(/ +/)
-    return if tokens.empty?
-
-    opts = {}
-    tokens[1..-1].each do |token|
-      case token[0]
-      when "!", 33
-        opts[:repo] = token[1..-1]
-      when "#", 35
-        opts[:tag]  = token[1..-1]
+      MGMT.xputs "33",  "### #{dep.name}"
+      if dep.pull!
+        MGMT.xputs nil, "    now at ##{dep.tag}"
       end
     end
-    Dep.new tokens[0], opts
+  end
+
+  def lock(deps)
+    deps.lock!
+    MGMT.xputs "32", "=== #{LOCKFILE} written"
   end
 
   def exec(*c)
@@ -74,7 +55,69 @@ module MGMT
     Kernel.exec *c
   end
 
+  class Deps < Array
+
+    def self.parse(file)
+      deps = []
+      File.read(file).each_line do |line|
+        deps.push Dep.parse(line)
+      end
+      new deps.compact
+    end
+
+    def find(name)
+      detect {|i| i.name == name }
+    end
+
+    def filter(names)
+      self.class.new select {|i| names.include?(i.name) }
+    end
+
+    def reset!
+      each do |dep|
+        dep.tag = nil
+      end
+    end
+
+    def merge!(locked)
+      each do |dep|
+        next if dep.tag
+
+        match = locked.find(dep.name)
+        dep.tag = match.tag if match
+      end
+    end
+
+    def lock!
+      temp = Tempfile.new LOCKFILE
+      each {|d| temp.puts d.to_s }
+      temp.close
+      FileUtils.mv temp.path, LOCKFILE
+    end
+
+  end
+
   class Dep
+
+    def self.parse(line)
+      line   = line.strip
+      return if line[0] == "#"
+
+      tokens = line.split(/ +/)
+      return if tokens.empty?
+
+      opts = {}
+      tokens[1..-1].each do |token|
+        case token[0]
+        when "!", 33
+          opts[:repo] = token[1..-1]
+        when "#", 35
+          opts[:tag]  = token[1..-1]
+        end
+      end
+      new tokens[0], opts
+    end
+
     attr_reader   :name, :repo
     attr_accessor :tag
 
@@ -89,14 +132,17 @@ module MGMT
     end
 
     def pull!
+      skip = false
       if File.directory?(target)
-        MGMT.sh "git -C #{target} pull -q origin master"
+        skip = @tag && @tag == `git -C #{target} log -n 1 --pretty=format:'%h'`.strip
+        MGMT.sh "git -C #{target} pull -q origin master" unless skip
       else
-        MGMT.sh "git clone #{@repo} #{target}"
+        MGMT.sh "git clone -q #{@repo} #{target}"
       end
 
       @tag ||= `git -C #{target} log -n 1 --pretty=format:'%h'`.strip
-      MGMT.sh "git -C #{target} reset --hard #{@tag}"
+      MGMT.sh "git -C #{target} reset -q --hard #{@tag}" unless skip
+      !skip
     end
 
     def to_s
@@ -109,18 +155,18 @@ end
 
 case ARGV.shift
 when "install", nil
-  deps = MGMT.read_deps
+  deps = MGMT.read
   MGMT.pull(deps)
-  MGMT.write_lockfile(deps)
+  MGMT.lock(deps)
 when "go"
   MGMT.exec "go", *ARGV
 when "update"
-  deps = MGMT.read_deps
-  some = deps.select {|d| ARGV.include?(d.name) }
+  deps = MGMT.read
+  some = deps.filter(ARGV)
   unless some.empty?
-    some.each {|d| d.tag = nil }
+    some.reset!
     MGMT.pull(some)
-    MGMT.write_lockfile(deps)
+    MGMT.lock(deps)
   end
 when "version"
   puts MGMT::VERSION
