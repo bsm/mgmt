@@ -9,7 +9,7 @@ module MGMT
   DEPSFILE = "Gopherfile"
   LOCKFILE = "Gopherfile.lock"
   VENDOR   = ".vendor"
-  VERSION  = "0.2.1"
+  VERSION  = "0.2.2"
 
   def xputs(code, msg)
     code = nil if ENV['TERM'] != "xterm"
