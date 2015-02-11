@@ -131,21 +131,17 @@ module MGMT
       @target ||= File.join(VENDOR, 'src', @name)
     end
 
-    def gitdir
-      @gitdir ||= File.join(target, '.git')
-    end
-
     def pull!
       skip = false
       if File.directory?(target)
-        skip = @tag && @tag == `git --git-dir=#{gitdir} log -n 1 --pretty=format:'%h'`.strip
-        MGMT.sh "git --git-dir=#{gitdir} pull -q origin master" unless skip
+        skip = @tag && @tag == `cd #{target} && git log -n 1 --pretty=format:'%h'`.strip
+        MGMT.sh "cd #{target} && git pull -q origin master" unless skip
       else
         MGMT.sh "git clone -q #{@repo} #{target}"
       end
 
-      @tag ||= `git --git-dir=#{gitdir} log -n 1 --pretty=format:'%h'`.strip
-      MGMT.sh "git --git-dir=#{gitdir} reset -q --hard #{@tag}" unless skip
+      @tag ||= `cd #{target} && git log -n 1 --pretty=format:'%h'`.strip
+      MGMT.sh "cd #{target} && git reset -q --hard #{@tag}" unless skip
       !skip
     end
 
