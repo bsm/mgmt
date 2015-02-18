@@ -9,7 +9,7 @@ module MGMT
   DEPSFILE = "Gopherfile"
   LOCKFILE = "Gopherfile.lock"
   VENDOR   = ".vendor"
-  VERSION  = "0.2.2"
+  VERSION  = "0.2.3"
 
   def xputs(code, msg)
     code = nil if ENV['TERM'] != "xterm"
@@ -134,14 +134,14 @@ module MGMT
     def pull!
       skip = false
       if File.directory?(target)
-        skip = @tag && @tag == `cd #{target} && git log -n 1 --pretty=format:'%h'`.strip
-        MGMT.sh "cd #{target} && git pull -q origin master" unless skip
+        skip = @tag && @tag == `cd #{target} && git --git-dir=.git log -n 1 --pretty=format:'%h'`.strip
+        MGMT.sh "cd #{target} && git --git-dir=.git pull -q origin master" unless skip
       else
         MGMT.sh "git clone -q #{@repo} #{target}"
       end
 
-      @tag ||= `cd #{target} && git log -n 1 --pretty=format:'%h'`.strip
-      MGMT.sh "cd #{target} && git reset -q --hard #{@tag}" unless skip
+      @tag ||= `cd #{target} && git --git-dir=.git log -n 1 --pretty=format:'%h'`.strip
+      MGMT.sh "cd #{target} && git --git-dir=.git reset -q --hard #{@tag}" unless skip
       !skip
     end
 
