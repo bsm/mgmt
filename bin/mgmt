@@ -135,7 +135,7 @@ module MGMT
       skip = false
       if File.directory?(target)
         skip = @tag && @tag == `cd #{target} && git --git-dir=.git log -n 1 --pretty=format:'%h'`.strip
-        MGMT.sh "cd #{target} && git --git-dir=.git pull -q origin master" unless skip
+        MGMT.sh "cd #{target} && git --git-dir=.git fetch -q --all" unless skip
       else
         MGMT.sh "git clone -q #{@repo} #{target}"
       end
