@@ -9,7 +9,7 @@ module MGMT
   DEPSFILE = "Gopherfile"
   LOCKFILE = "Gopherfile.lock"
   VENDOR   = ".vendor"
-  VERSION  = "0.2.4"
+  VERSION  = "0.3.0"
 
   def xputs(code, msg)
     code = nil if ENV['TERM'] != "xterm"
@@ -23,6 +23,12 @@ module MGMT
     system(cmd) || abort("Failed to execute command: #{cmd}")
   end
 
+  def shv(cmd)
+    value = `#{cmd}`
+    abort "Failed to execute command: #{cmd}" unless $?.success?
+    value.strip
+  end
+
   def abort(msg)
     xputs "31", ">>> #{msg}"
     Kernel.exit(1)
@@ -31,8 +37,8 @@ module MGMT
   def read
     abort "#{DEPSFILE} not found" unless File.exist?(DEPSFILE)
 
-    deps = Deps.parse(DEPSFILE)
-    deps.merge! Deps.parse(LOCKFILE) if File.exist?(LOCKFILE)
+    deps = Deps.parse(DEPSFILE, :tag)
+    deps.merge! Deps.parse(LOCKFILE, :rev) if File.exist?(LOCKFILE)
     deps
   end
 
@@ -40,8 +46,21 @@ module MGMT
     deps.each do |dep|
       MGMT.xputs "33",  "### #{dep.name}"
       if dep.pull!
-        MGMT.xputs nil, "    now at ##{dep.tag}"
+        MGMT.xputs nil, "    now at ##{dep.version}"
       end
+    end
+  end
+
+  def update(deps, updates)
+    versions = {}
+    updates.each do |str|
+      name, rev = str.split("#", 2)
+      versions[name] = rev
+    end
+    deps.select do |dep|
+      versions.include?(dep.name)
+    end.each do |dep|
+      dep.rev = versions[dep.name]
     end
   end
 
@@ -52,15 +71,15 @@ module MGMT
 
   def exec(*c)
     ENV['GOPATH'] = "#{File.expand_path(VENDOR, ".")}:#{ENV['GOPATH']}"
-    Kernel.exec *c
+    Kernel.exec(*c)
   end
 
   class Deps < Array
 
-    def self.parse(file)
+    def self.parse(file, field)
       deps = []
       File.read(file).each_line do |line|
-        deps.push Dep.parse(line)
+        deps.push Dep.parse(line, field)
       end
       new deps.compact
     end
@@ -69,28 +88,20 @@ module MGMT
       detect {|i| i.name == name }
     end
 
-    def filter(names)
-      self.class.new select {|i| names.include?(i.name) }
-    end
-
-    def reset!
-      each do |dep|
-        dep.tag = nil
-      end
+    def select
+      self.class.new(super)
     end
 
     def merge!(locked)
       each do |dep|
-        next if dep.tag
-
-        match = locked.find(dep.name)
-        dep.tag = match.tag if match
+        match   = locked.find(dep.name)
+        dep.rev = match.rev if match
       end
     end
 
     def lock!
       temp = Tempfile.new LOCKFILE
-      each {|d| temp.puts d.to_s }
+      each {|dep| temp.puts dep.to_s }
       temp.close
       FileUtils.mv temp.path, LOCKFILE
     end
@@ -99,7 +110,7 @@ module MGMT
 
   class Dep
 
-    def self.parse(line)
+    def self.parse(line, field)
       line   = line.strip
       return if line[0] == "#"
 
@@ -112,18 +123,19 @@ module MGMT
         when "!", 33
           opts[:repo] = token[1..-1]
         when "#", 35
-          opts[:tag]  = token[1..-1]
+          opts[field] = token[1..-1]
         end
       end
       new tokens[0], opts
     end
 
     attr_reader   :name, :repo
-    attr_accessor :tag
+    attr_accessor :tag, :rev
 
     def initialize(name, opts = {})
       @name = name
-      @tag  = opts[:tag]
+      @tag  = opts[:tag] # Specified tag
+      @rev  = opts[:rev] # Locked rev
       @repo = opts[:repo] || "http://#{name}"
     end
 
@@ -131,22 +143,29 @@ module MGMT
       @target ||= File.join(VENDOR, 'src', @name)
     end
 
+    def version
+      @rev || @tag || 'master'
+    end
+
     def pull!
-      skip = false
-      if File.directory?(target)
-        skip = @tag && @tag == `cd #{target} && git --git-dir=.git log -n 1 --pretty=format:'%h'`.strip
-        MGMT.sh "cd #{target} && git --git-dir=.git fetch -q --all" unless skip
-      else
+      current = MGMT.shv("cd #{target} && git --git-dir=.git log -n 1 --pretty=format:'%h'") if File.directory?(target)
+      return false if current && current == rev
+
+      if current.nil?
         MGMT.sh "git clone -q #{@repo} #{target}"
+      else
+        MGMT.sh "cd #{target} && git --git-dir=.git fetch -q origin"
       end
 
-      @tag ||= `cd #{target} && git --git-dir=.git log -n 1 --pretty=format:'%h'`.strip
-      MGMT.sh "cd #{target} && git --git-dir=.git reset -q --hard #{@tag}" unless skip
-      !skip
+      remote = "origin/#{version}"
+      @rev = MGMT.shv "cd #{target} && git --git-dir=.git show-ref -q #{remote} && git --git-dir=.git rev-parse --short #{remote} || git --git-dir=.git rev-parse --short #{version}"
+
+      MGMT.sh "cd #{target} && git --git-dir=.git reset -q --hard #{rev}"
+      true
     end
 
     def to_s
-      "#{@name} ##{@tag} !#{@repo}"
+      "#{@name} ##{version} !#{@repo}"
     end
   end
 end
@@ -162,9 +181,8 @@ when "go"
   MGMT.exec "go", *ARGV
 when "update"
   deps = MGMT.read
-  some = deps.filter(ARGV)
+  some = MGMT.update(deps, ARGV)
   unless some.empty?
-    some.reset!
     MGMT.pull(some)
     MGMT.lock(deps)
   end
