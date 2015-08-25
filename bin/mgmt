@@ -2,6 +2,7 @@
 
 require 'fileutils'
 require 'tempfile'
+require 'pathname'
 
 module MGMT
   extend self
@@ -70,8 +71,15 @@ module MGMT
   end
 
   def exec(*c)
-    ENV['GOPATH'] = "#{File.expand_path(VENDOR, ".")}:#{ENV['GOPATH']}"
+    ENV['GOPATH'] = [find_vendor, ENV['GOPATH']].join(':')
     Kernel.exec(*c)
+  end
+
+  def find_vendor
+    Pathname.pwd.ascend do |dir|
+      vendor = dir.join(VENDOR)
+      return vendor if vendor.directory?
+    end
   end
 
   class Deps < Array
