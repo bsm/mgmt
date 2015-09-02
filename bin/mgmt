@@ -71,14 +71,14 @@ module MGMT
   end
 
   def exec(*c)
-    ENV['GOPATH'] = [find_vendor, ENV['GOPATH']].join(':')
+    ENV['GOPATH'] = [find_vendor, ENV['GOPATH']].compact.join(':')
     Kernel.exec(*c)
   end
 
   def find_vendor
     Pathname.pwd.ascend do |dir|
       vendor = dir.join(VENDOR)
-      return vendor if vendor.directory?
+      return vendor if vendor.realpath.directory?
     end
   end
 
