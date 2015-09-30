@@ -78,7 +78,7 @@ module MGMT
   def find_vendor
     Pathname.pwd.ascend do |dir|
       vendor = dir.join(VENDOR)
-      return vendor if vendor.realpath.directory?
+      return vendor if vendor.exist? && vendor.realpath.directory?
     end
   end
 
