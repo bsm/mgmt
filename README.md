@@ -1,9 +1,9 @@
-= MGMT
+# MGMT
 
 A minimalistic, self-contained, massively opinionated dependency manager
 for Go.
 
-== Installation
+## Installation
 
 Install it via rubygems:
 
@@ -15,9 +15,9 @@ Or, just download it:
     chmod +x mgmt
     ./mgmt help
 
-== Usage
+## Usage
 
-Create a Gomtfile, e.g.:
+Create a Gopherfile, e.g.:
 
     # Standard dependencies
     github.com/gorilla/context
@@ -42,9 +42,9 @@ The commands are:
     version  print the version
     help     print this information
 
-== LICENCE
+## LICENCE
 
-  Copyright (c) 2015 Black Square Media
+  Copyright (c) 2016 Black Square Media
 
   Permission is hereby granted, free of charge, to any person obtaining
   a copy of this software and associated documentation files (the
